@@ -5,6 +5,7 @@
 #include <iodrivers_base/Driver.hpp>
 #include <ptu_kongsberg_oe10/Status.hpp>
 #include <ptu_kongsberg_oe10/PanTiltStatus.hpp>
+#include <map>
 
 namespace ptu_kongsberg_oe10
 {
@@ -17,6 +18,7 @@ namespace ptu_kongsberg_oe10
         Status getStatus(int device_id);
 
         void requestPanTiltStatus(int device_id);
+        bool isPanTiltStatusRequested(int device_id)const;
         PanTiltStatus readPanTiltStatus(int device_id);
         PanTiltStatus getPanTiltStatus(int device_id);
 
@@ -58,6 +60,8 @@ namespace ptu_kongsberg_oe10
 
         std::vector<boost::uint8_t> writeBuffer;
         int extractPacket(boost::uint8_t const* buffer, size_t size) const;
+
+        std::map<int,bool> pan_tilt_status_requested;
     };
 }
 
