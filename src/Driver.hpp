@@ -34,7 +34,9 @@ namespace ptu_kongsberg_oe10
 
 	double tiltUp(int device_id);
 	double tiltDown(int device_id);
-	double tiltStop(int device_id);
+	
+        double tiltStop(int device_id); // sometimes the ptu just does not ack
+	double panStop(int device_id);  // sometimes the ptu just does not ack
 
     protected:
         /** Read the response of a command and validates it

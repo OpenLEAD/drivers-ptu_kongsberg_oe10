@@ -144,6 +144,11 @@ double Driver::tiltStop(int device_id)
     return simpleMovement(device_id, 'T', 'S');
 }
 
+double Driver::panStop(int device_id)
+{
+    return simpleMovement(device_id, 'P', 'S');
+}
+
 double Driver::simpleMovement(int device_id, char cmd0, char cmd1)
 {
     Packet packet(device_id);
