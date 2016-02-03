@@ -79,7 +79,7 @@ Status Driver::getStatus(int device_id)
     status.camera.flash           = (b1 & 0x08) != 0;
     status.camera.flash_charged   = (b1 & 0x10) != 0;
 
-    status.temperature = base::Temperature::fromCelsius((b2 & 0xF) * 5 - 5);
+    status.temperature = base::Temperature::fromCelsius(double(b2 & 0xF) * 80.0/15.0 - 5);
     status.humidity    = static_cast<int>(b2 >> 8) * 100 / 16;
 
     float pan  = Packet::parseAngle(response.data + 3);
