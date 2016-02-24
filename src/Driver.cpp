@@ -22,7 +22,7 @@ void Driver::useEndStops(int device_id, bool enable)
     packet.data[0] = enable ? 0x31 : 0x30;
     writePacket(packet);
     Packet response = readResponse(packet, 1);
-    if (response.data[2] != packet.data[0])
+    if(response.data[2] != packet.data[0])
         throw std::runtime_error("boolean in the reply for use end stops command mismatches the sent command");
 }
 
@@ -60,7 +60,7 @@ Status Driver::getStatus(int device_id)
     packet.setCommand('S', 'T');
     writePacket(packet);
     Packet response = readResponse(packet, 9);
-    
+
     Status status;
     byte b0 = response.data[0];
     byte b1 = response.data[1];
@@ -79,7 +79,7 @@ Status Driver::getStatus(int device_id)
     status.camera.flash           = (b1 & 0x08) != 0;
     status.camera.flash_charged   = (b1 & 0x10) != 0;
 
-    status.temperature = base::Temperature::fromCelsius((b2 & 0xF) * 5 - 5);
+    status.temperature = base::Temperature::fromCelsius(double(b2 & 0xF) * 80.0/15.0 - 5);
     status.humidity    = static_cast<int>(b2 >> 8) * 100 / 16;
 
     float pan  = Packet::parseAngle(response.data + 3);
@@ -91,13 +91,28 @@ Status Driver::getStatus(int device_id)
 
 void Driver::requestPanTiltStatus(int device_id)
 {
+    if(isPanTiltStatusRequested(device_id))
+        throw std::runtime_error("pan tilt status was already requested");
     Packet packet(device_id);
     packet.setCommand('A', 'S');
     writePacket(packet);
+    pan_tilt_status_requested[device_id] = true;
+}
+
+bool Driver::isPanTiltStatusRequested(int device_id)const
+{
+    std::map<int,bool>::const_iterator iter = pan_tilt_status_requested.find(device_id);
+    if(iter != pan_tilt_status_requested.end())
+        return iter->second;
+    return false;
 }
 
 PanTiltStatus Driver::readPanTiltStatus(int device_id)
 {
+    if(!pan_tilt_status_requested[device_id])
+        throw std::runtime_error("readPanTiltStatus: request pan tilt status first!");
+
+    pan_tilt_status_requested[device_id] = false;
     Packet packet(device_id);
     packet.setCommand('A', 'S');
     Packet response = readResponse(packet, 10);
@@ -142,6 +157,11 @@ double Driver::tiltDown(int device_id)
 double Driver::tiltStop(int device_id)
 {
     return simpleMovement(device_id, 'T', 'S');
+}
+
+double Driver::panStop(int device_id)
+{
+    return simpleMovement(device_id, 'P', 'S');
 }
 
 double Driver::simpleMovement(int device_id, char cmd0, char cmd1)
@@ -208,11 +228,28 @@ Packet Driver::readPacket()
 {
     byte buffer[Packet::MAX_PACKET_SIZE];
     int packetSize = iodrivers_base::Driver::readPacket(buffer, Packet::MAX_PACKET_SIZE);
-    return Packet::parse(buffer, packetSize, false);
+
+    Packet packet = Packet::parse(buffer, packetSize, false);
+
+    // request again if a request is already running
+    // assuming writePacket has cleared it
+    if(isPanTiltStatusRequested(packet.from))
+    {
+        pan_tilt_status_requested[int(packet.from)] = false;
+        requestPanTiltStatus(packet.from);
+    }
+    return packet;
 }
 
 void Driver::writePacket(Packet const& packet)
 {
+    // clear buffer
+    if(isPanTiltStatusRequested(packet.to))
+    {
+        readPanTiltStatus(packet.to);
+        pan_tilt_status_requested[int(packet.to)] = true; // mark that we still need it
+    }
+
     writeBuffer.clear();
     packet.marshal(writeBuffer);
     LOG_DEBUG_S << "writing " << writeBuffer.size() << " bytes: " << Packet::kongsberg_com(&writeBuffer[0], writeBuffer.size());
